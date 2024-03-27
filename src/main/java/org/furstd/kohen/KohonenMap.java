@@ -14,18 +14,18 @@ public class KohonenMap {
         this.weights = new double[inputDim][numNeurons];
     }
 
-    public void train(double[][] inputs, double alpha, int epochs) {
+    public void train(double[] input, double alpha, int epochs) {
         for (int epoch = 0; epoch < epochs; epoch++) {
             System.out.println("\nEpoch " + (epoch + 1));
 
-            for (double[] input : inputs) {
-                int bmuIndex = findBMU(input);
-                System.out.println("Chosen D" + (bmuIndex + 1));
+            int bmuIndex = findBMU(input);
+            System.out.println("Chosen D" + (bmuIndex + 1));
 
-                for (int j = 0; j < inputDim; j++) {
-                    weights[bmuIndex][j] += alpha * (input[j] - weights[bmuIndex][j]);
-                }
+            for (int j = 0; j < inputDim; j++) {
+                weights[j][bmuIndex] += alpha * (input[j] - weights[j][bmuIndex]);
             }
+
+            printWeights();
         }
     }
 
@@ -41,7 +41,7 @@ public class KohonenMap {
         }
         coords.append("]");
 
-        System.out.println("BMU Index: " + bmuIndex + " with coordinates: " + coords);
+        System.out.println("BMU Index: " + (bmuIndex + 1) + " with coordinates: " + coords);
         return bmuIndex;
     }
 
@@ -106,15 +106,13 @@ public class KohonenMap {
                     System.out.println("Enter number of epochs:");
                     int epochs = scanner.nextInt();
                     System.out.println("Enter training patterns separated by spaces (each line a new pattern):");
-                    double[][] inputs = new double[numNeurons][inputDim];
-                    for (int i = 0; i < numNeurons; i++) {
-                        System.out.println("Pattern " + (i + 1) + ":");
-                        for (int j = 0; j < inputDim; j++) {
-                            inputs[i][j] = scanner.nextDouble();
-                        }
+
+                    double[] input = new double[inputDim];
+                    for (int i = 0; i < inputDim; i++) {
+                        input[i] = scanner.nextDouble();
                     }
 
-                    map.train(inputs, alpha, epochs);
+                    map.train(input, alpha, epochs);
                     break;
                 case 2:
                     map.printWeights();
