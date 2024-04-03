@@ -173,14 +173,46 @@ public class FeedForwardNetwork {
             e[i] = t[i] - finalY[i];
         }
 
+        System.out.println("E: ");
         System.out.println(Arrays.toString(e));
 
-        for (int layers = 0; layers < weights.length; layers++) {
-            LayerData layerData = layersData.get(layers);
-            for (int neurons = 0; neurons < layerData.getNeuronCount(); neurons++) {
-                System.out.println("Layer " + layers + " Neuron " + neurons);
+        for (int layer = weights.length - 1; layer >= 0; layer--) {
+            LayerData layerData = layersData.get(layer);
+            double[] localGradients = new double[layerData.getNeuronCount()];
+
+            for (int neuron = 0; neuron < layerData.getNeuronCount(); neuron++) {
+                if (layerData.getActivationFunction() == ActivationFunction.LINEAR_IDENT) {
+                    localGradients[neuron] = e[neuron];
+                } else {
+                    double derivation = roundTo4DecimalPlaces(derivateTanh(layerData.getY()[neuron]));
+                    System.out.println("Derivation: " + derivation);
+                    LayerData nextLayerData = layersData.get(layer + 1);
+                    double sum = 0;
+                    for (int i = 0; i < layerData.getNeuronCount(); i++) {
+                        System.out.println("Next gradients: " + Arrays.toString(nextLayerData.getLocalGradients()));
+                        double[] neuronWeights = weights[layer + 1][neuron + 1];
+                        System.out.println(Arrays.toString(neuronWeights));
+                        sum += nextLayerData.getLocalGradients()[i] * neuronWeights[i];
+//                        System.out.println("Counting: " + nextLayerData.getLocalGradients()[i] + " * " + neuronWeights[i]);
+//                        System.out.println("Result: " + nextLayerData.getLocalGradients()[i] * neuronWeights[i]);
+                    }
+
+                    double delta = derivation * sum;
+//                    System.out.println("Total result: " + delta + "\n\n\n");
+                    localGradients[neuron] = delta;
+                }
             }
+            layerData.setLocalGradients(localGradients);
         }
+
+//        for (LayerData data: layersData) {
+//            System.out.println("\nDelta: ");
+//            System.out.println(Arrays.toString(data.getLocalGradients()));
+//        }
+    }
+
+    private double derivateTanh(double value) {
+        return 1 - Math.pow(value, 2);
     }
 
 
@@ -188,32 +220,32 @@ public class FeedForwardNetwork {
         Scanner scanner = new Scanner(System.in);
         FeedForwardNetwork ffnn = new FeedForwardNetwork();
 
-        System.out.println("Enter number of layers (included input layer): ");
-        int numberOfLayers = scanner.nextInt();
-
-        ffnn.initializeNetwork(numberOfLayers, scanner);
+//        System.out.println("Enter number of layers (included input layer): ");
+//        int numberOfLayers = scanner.nextInt();
+//
+//        ffnn.initializeNetwork(numberOfLayers, scanner);
 
         // Pro účely testování matici sestavíme ručně
-//        double weights[][][] = {
-//                {
-//                        {0.8, 0.3},
-//                        {-0.1, 1.2}
-//                },
-//                {
-//                        {-0.1, 0.2},
-//                        {0.4, 0.3},
-//                        {-0.4, 0.8}
-//                }
-//        };
-//
-//        LayerData l1 = new LayerData();
-//        l1.setNeuronCount(2);
-//        l1.setActivationFunction(ActivationFunction.HYPERBOLIC_TANGENT);
-//        ffnn.addLayerData(l1);
-//        LayerData l2 = new LayerData();
-//        l2.setNeuronCount(2);
-//        l2.setActivationFunction(ActivationFunction.LINEAR_IDENT);
-//        ffnn.addLayerData(l2);
+        double weights[][][] = {
+                {
+                        {0.8, 0.3},
+                        {-0.1, 1.2}
+                },
+                {
+                        {-0.1, 0.2},
+                        {0.4, 0.3},
+                        {-0.4, 0.8}
+                }
+        };
+
+        LayerData l1 = new LayerData();
+        l1.setNeuronCount(2);
+        l1.setActivationFunction(ActivationFunction.HYPERBOLIC_TANGENT);
+        ffnn.addLayerData(l1);
+        LayerData l2 = new LayerData();
+        l2.setNeuronCount(2);
+        l2.setActivationFunction(ActivationFunction.LINEAR_IDENT);
+        ffnn.addLayerData(l2);
 
 
 //        double weights[][][] = {
@@ -237,7 +269,7 @@ public class FeedForwardNetwork {
 //        l2.setActivationFunction(ActivationFunction.LINEAR_IDENT);
 //        ffnn.addLayerData(l2);
 //
-//        ffnn.setWeights(weights);
+        ffnn.setWeights(weights);
 
         while (true) {
             System.out.println("\nMenu:");
@@ -261,8 +293,8 @@ public class FeedForwardNetwork {
                     ffnn.printWeights();
                     break;
                 case 3:
-//                    l1.setY(new double[]{0.649, 0.537});
-//                    l2.setY(new double[]{-0.0549, 0.8246});
+                    l1.setY(new double[]{0.649, 0.537});
+                    l2.setY(new double[]{-0.0549, 0.8246});
 
                     int tSize = ffnn.layersData.get(ffnn.layersData.size() - 1).getNeuronCount();
                     System.out.println("Enter t vector separated by spaces: ");

@@ -7,6 +7,8 @@ public class LayerData {
 
     private ActivationFunction activationFunction;
 
+    private double[] localGradients;
+
     public int getNeuronCount() {
         return neuronCount;
     }
@@ -29,5 +31,13 @@ public class LayerData {
 
     public void setActivationFunction(ActivationFunction activationFunction) {
         this.activationFunction = activationFunction;
+    }
+
+    public double[] getLocalGradients() {
+        return localGradients;
+    }
+
+    public void setLocalGradients(double[] localGradients) {
+        this.localGradients = localGradients;
     }
 }
