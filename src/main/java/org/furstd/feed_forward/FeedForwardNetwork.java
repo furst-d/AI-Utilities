@@ -88,38 +88,13 @@ public class FeedForwardNetwork {
         }
     }
 
-    public void computeResponse() {
-        double[] input = x.stream().mapToDouble(Double::doubleValue).toArray();
-
-        for (int i = 0; i < weights.length; i++) {
-            LayerData layerData = layersData.get(i);
-            input = addBiasToInput(input);
-
-            double[][] transposeMatrix = transposeMatrix(weights[i]);
-            double[] output = new double[transposeMatrix.length];
-
-            for (int j = 0; j < transposeMatrix.length; j++) {
-                for (int k = 0; k < transposeMatrix[0].length; k++) {
-                    double value = transposeMatrix[j][k];
-                    output[j] += input[k] * value;
-                }
-                output[j] = roundTo4DecimalPlaces(output[j]);
-            }
-
-            System.out.println("\ny" + (i + 1) + "a = " + Arrays.toString(output));
-            input = applyActivationFunction(output, layerData.getActivationFunction());
-            layerData.setY(input);
-            System.out.println("y" + (i + 1) + " = " + Arrays.toString(input));
-        }
-    }
-
-    public void printWeights() {
+    public void printWeights(double[][][] weights) {
         for (int layer = 0; layer < weights.length; layer++) {
             System.out.println("Weights of layer w" + (layer + 1) + ":");
 
             for (int neuron = 0; neuron < weights[layer].length; neuron++) {
                 for (int input = 0; input < weights[layer][0].length; input++) {
-                    System.out.print(String.format("%.1f ", weights[layer][neuron][input]).replace(",", "."));
+                    System.out.print(String.format("%.4f ", weights[layer][neuron][input]).replace(",", "."));
                 }
                 System.out.println();
             }
@@ -165,16 +140,46 @@ public class FeedForwardNetwork {
         }
     }
 
-    public void computeBGD(double[] t) {
+    public void computeResponse() {
+        double[] input = x.stream().mapToDouble(Double::doubleValue).toArray();
+
+        for (int i = 0; i < weights.length; i++) {
+            LayerData layerData = layersData.get(i);
+            input = addBiasToInput(input);
+
+            double[][] transposeMatrix = transposeMatrix(weights[i]);
+            double[] output = new double[transposeMatrix.length];
+
+            for (int j = 0; j < transposeMatrix.length; j++) {
+                for (int k = 0; k < transposeMatrix[0].length; k++) {
+                    double value = transposeMatrix[j][k];
+                    output[j] += input[k] * value;
+                }
+                output[j] = roundTo4DecimalPlaces(output[j]);
+            }
+
+            System.out.println("\ny" + (i + 1) + "a = " + Arrays.toString(output));
+            input = applyActivationFunction(output, layerData.getActivationFunction());
+            layerData.setY(input);
+            System.out.println("y" + (i + 1) + " = " + Arrays.toString(input));
+        }
+    }
+
+    public void computeBGD(double[] t, double alpha) {
         double[] e = new double[t.length];
         double[] finalY = layersData.get(layersData.size() - 1).getY();
 
+        /*
+        Compute error vector e
+         */
         for (int i = 0; i < t.length; i++) {
-            e[i] = t[i] - finalY[i];
+            e[i] = roundTo4DecimalPlaces(t[i] - finalY[i]);
         }
+        System.out.println("Error vector e: " + Arrays.toString(e));
 
-        System.out.println("E: ");
-        System.out.println(Arrays.toString(e));
+        /*
+        Compute local gradients
+        */
 
         for (int layer = weights.length - 1; layer >= 0; layer--) {
             LayerData layerData = layersData.get(layer);
@@ -185,34 +190,60 @@ public class FeedForwardNetwork {
                     localGradients[neuron] = e[neuron];
                 } else {
                     double derivation = roundTo4DecimalPlaces(derivateTanh(layerData.getY()[neuron]));
-                    System.out.println("Derivation: " + derivation);
                     LayerData nextLayerData = layersData.get(layer + 1);
                     double sum = 0;
                     for (int i = 0; i < layerData.getNeuronCount(); i++) {
-                        System.out.println("Next gradients: " + Arrays.toString(nextLayerData.getLocalGradients()));
                         double[] neuronWeights = weights[layer + 1][neuron + 1];
-                        System.out.println(Arrays.toString(neuronWeights));
                         sum += nextLayerData.getLocalGradients()[i] * neuronWeights[i];
-//                        System.out.println("Counting: " + nextLayerData.getLocalGradients()[i] + " * " + neuronWeights[i]);
-//                        System.out.println("Result: " + nextLayerData.getLocalGradients()[i] * neuronWeights[i]);
                     }
 
                     double delta = derivation * sum;
-//                    System.out.println("Total result: " + delta + "\n\n\n");
-                    localGradients[neuron] = delta;
+                    localGradients[neuron] = roundTo4DecimalPlaces(delta);
                 }
             }
             layerData.setLocalGradients(localGradients);
+            System.out.println("Local gradients for layer " + layer + ": " + Arrays.toString(localGradients));
         }
 
-//        for (LayerData data: layersData) {
-//            System.out.println("\nDelta: ");
-//            System.out.println(Arrays.toString(data.getLocalGradients()));
-//        }
+        /*
+        Compute new weights
+         */
+        double[][][] backpropagationWeights = new double[weights.length][][];
+        for (int layer = weights.length - 1; layer >= 0; layer--) {
+            backpropagationWeights[layer] = new double[weights[layer].length][weights[layer][0].length];
+            LayerData layerData = layersData.get(layer);
+
+            double[] previousLayerYVector = getYVector(layer - 1);
+            for (int neuron = 0; neuron < layerData.getNeuronCount(); neuron++) {
+                backpropagationWeights[layer][neuron] = new double[layerData.getNeuronCount()];
+                for (int i = 0; i < layerData.getNeuronCount(); i++) {
+                    double oldWeight = weights[layer][neuron][i];
+                    double delta = layerData.getLocalGradients()[i];
+                    double backpropagation = roundTo4DecimalPlaces(alpha * delta * previousLayerYVector[neuron]);
+                    backpropagationWeights[layer][neuron][i] = backpropagation;
+
+                    double newWeight = oldWeight + backpropagation;
+                    weights[layer][neuron][i] = newWeight;
+                }
+            }
+        }
+
+        System.out.println("\nBackpropagation weights:");
+        printWeights(backpropagationWeights);
+        System.out.println("\nNew weights:");
+        printWeights(weights);
     }
 
     private double derivateTanh(double value) {
         return 1 - Math.pow(value, 2);
+    }
+
+    private double[] getYVector(int layer) {
+        if (layer == -1) {
+            return addBiasToInput(x.stream().mapToDouble(Double::doubleValue).toArray());
+        } else {
+            return addBiasToInput(layersData.get(layer).getY());
+        }
     }
 
 
@@ -220,32 +251,55 @@ public class FeedForwardNetwork {
         Scanner scanner = new Scanner(System.in);
         FeedForwardNetwork ffnn = new FeedForwardNetwork();
 
-//        System.out.println("Enter number of layers (included input layer): ");
-//        int numberOfLayers = scanner.nextInt();
-//
-//        ffnn.initializeNetwork(numberOfLayers, scanner);
+        System.out.println("Enter number of layers (included input layer): ");
+        int numberOfLayers = scanner.nextInt();
+
+        ffnn.initializeNetwork(numberOfLayers, scanner);
 
         // Pro účely testování matici sestavíme ručně
-        double weights[][][] = {
-                {
-                        {0.8, 0.3},
-                        {-0.1, 1.2}
-                },
-                {
-                        {-0.1, 0.2},
-                        {0.4, 0.3},
-                        {-0.4, 0.8}
-                }
-        };
+//        double weights[][][] = {
+//                {
+//                        {0.8, 0.3},
+//                        {-0.1, 1.2}
+//                },
+//                {
+//                        {-0.1, 0.2},
+//                        {0.4, 0.3},
+//                        {-0.4, 0.8}
+//                }
+//        };
+//
+//        LayerData l1 = new LayerData();
+//        l1.setNeuronCount(2);
+//        l1.setActivationFunction(ActivationFunction.HYPERBOLIC_TANGENT);
+//        ffnn.addLayerData(l1);
+//        LayerData l2 = new LayerData();
+//        l2.setNeuronCount(2);
+//        l2.setActivationFunction(ActivationFunction.LINEAR_IDENT);
+//        ffnn.addLayerData(l2);
+//        ffnn.setWeights(weights);
 
-        LayerData l1 = new LayerData();
-        l1.setNeuronCount(2);
-        l1.setActivationFunction(ActivationFunction.HYPERBOLIC_TANGENT);
-        ffnn.addLayerData(l1);
-        LayerData l2 = new LayerData();
-        l2.setNeuronCount(2);
-        l2.setActivationFunction(ActivationFunction.LINEAR_IDENT);
-        ffnn.addLayerData(l2);
+//        double weights[][][] = {
+//                {
+//                        {1, -1},
+//                        {1, 2}
+//                },
+//                {
+//                        {1, 1},
+//                        {2, -1},
+//                        {1, 2}
+//                }
+//        };
+//
+//        LayerData l1 = new LayerData();
+//        l1.setNeuronCount(2);
+//        l1.setActivationFunction(ActivationFunction.HYPERBOLIC_TANGENT);
+//        ffnn.addLayerData(l1);
+//        LayerData l2 = new LayerData();
+//        l2.setNeuronCount(2);
+//        l2.setActivationFunction(ActivationFunction.LINEAR_IDENT);
+//        ffnn.addLayerData(l2);
+//        ffnn.setWeights(weights);
 
 
 //        double weights[][][] = {
@@ -268,8 +322,7 @@ public class FeedForwardNetwork {
 //        l2.setNeuronCount(1);
 //        l2.setActivationFunction(ActivationFunction.LINEAR_IDENT);
 //        ffnn.addLayerData(l2);
-//
-        ffnn.setWeights(weights);
+//        ffnn.setWeights(weights);
 
         while (true) {
             System.out.println("\nMenu:");
@@ -290,11 +343,12 @@ public class FeedForwardNetwork {
                     ffnn.computeResponse();
                     break;
                 case 2:
-                    ffnn.printWeights();
+                    ffnn.printWeights(ffnn.weights);
                     break;
                 case 3:
-                    l1.setY(new double[]{0.649, 0.537});
-                    l2.setY(new double[]{-0.0549, 0.8246});
+//                    ffnn.addX(0.25);
+//                    l1.setY(new double[]{0.649, 0.537});
+//                    l2.setY(new double[]{-0.0549, 0.8246});
 
                     int tSize = ffnn.layersData.get(ffnn.layersData.size() - 1).getNeuronCount();
                     System.out.println("Enter t vector separated by spaces: ");
@@ -303,7 +357,10 @@ public class FeedForwardNetwork {
                         t[i] = scanner.nextDouble();
                     }
 
-                    ffnn.computeBGD(t);
+                    System.out.println("Enter alpha: ");
+                    double alpha = scanner.nextDouble();
+
+                    ffnn.computeBGD(t, alpha);
                     break;
                 case 4:
                     System.out.println("Exiting...");
